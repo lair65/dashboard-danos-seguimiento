@@ -15,7 +15,7 @@ st.set_page_config(
 @st.cache_data
 def load_data():
     """Load and preprocess the Excel data"""
-    df = pd.read_excel("Reporte Daños.xlsx")
+    df = pd.read_excel("reporte_danos.xlsx")
     
     # Clean executive names to remove trailing spaces
     df['Ejecutivo'] = df['Ejecutivo'].str.strip()
