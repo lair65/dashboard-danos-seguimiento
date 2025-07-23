@@ -148,10 +148,10 @@ def main():
     # Custom CSS for better dropdown styling
     st.markdown("""
     <style>
-    /* Sidebar selectbox styling */
+    /* Force dark theme for all dropdowns */
     .stSelectbox > div > div > div {
-        background-color: #323d45 !important;
-        border: 1px solid #4a5661 !important;
+        background-color: #2c3642 !important;
+        border: 1px solid #3d4a56 !important;
         border-radius: 8px;
         color: white !important;
     }
@@ -159,7 +159,7 @@ def main():
     /* Selectbox text styling */
     .stSelectbox > div > div > div > div {
         color: white !important;
-        background-color: #323d45 !important;
+        background-color: #2c3642 !important;
     }
     
     /* Remove text selection highlight */
@@ -174,39 +174,39 @@ def main():
     
     /* Hover effect for selectboxes */
     .stSelectbox > div > div > div:hover {
-        background-color: #3e4a52 !important;
-        border-color: #5a6870 !important;
+        background-color: #374149 !important;
+        border-color: #4a5661 !important;
         box-shadow: none !important;
     }
     
     /* Dropdown options styling */
     .stSelectbox [data-baseweb="popover"] {
-        background-color: #323d45 !important;
+        background-color: #2c3642 !important;
     }
     
     .stSelectbox [data-baseweb="menu"] {
-        background-color: #323d45 !important;
-        border: 1px solid #4a5661 !important;
+        background-color: #2c3642 !important;
+        border: 1px solid #3d4a56 !important;
     }
     
     .stSelectbox [data-baseweb="menu"] > ul {
-        background-color: #323d45 !important;
+        background-color: #2c3642 !important;
     }
     
     .stSelectbox [data-baseweb="option"] {
-        background-color: #323d45 !important;
+        background-color: #2c3642 !important;
         color: white !important;
     }
     
     .stSelectbox [data-baseweb="option"]:hover {
-        background-color: #3e4a52 !important;
+        background-color: #374149 !important;
         color: white !important;
     }
     
     /* Multiselect styling */
     .stMultiSelect > div > div > div {
-        background-color: #323d45 !important;
-        border: 1px solid #4a5661 !important;
+        background-color: #2c3642 !important;
+        border: 1px solid #3d4a56 !important;
         border-radius: 8px;
         color: white !important;
     }
@@ -223,8 +223,8 @@ def main():
     }
     
     .stMultiSelect > div > div > div:hover {
-        background-color: #3e4a52 !important;
-        border-color: #5a6870 !important;
+        background-color: #374149 !important;
+        border-color: #4a5661 !important;
         box-shadow: none !important;
     }
     
@@ -237,21 +237,21 @@ def main():
     
     /* Multiselect dropdown options */
     .stMultiSelect [data-baseweb="popover"] {
-        background-color: #323d45 !important;
+        background-color: #2c3642 !important;
     }
     
     .stMultiSelect [data-baseweb="menu"] {
-        background-color: #323d45 !important;
-        border: 1px solid #4a5661 !important;
+        background-color: #2c3642 !important;
+        border: 1px solid #3d4a56 !important;
     }
     
     .stMultiSelect [data-baseweb="option"] {
-        background-color: #323d45 !important;
+        background-color: #2c3642 !important;
         color: white !important;
     }
     
     .stMultiSelect [data-baseweb="option"]:hover {
-        background-color: #3e4a52 !important;
+        background-color: #374149 !important;
         color: white !important;
     }
     </style>
@@ -264,7 +264,7 @@ def main():
         st.error(f"❌ Error al cargar datos: {e}")
         return
     
-    # Sidebar filters (moved before title to get week selection)
+    # Sidebar filters (moved before title to get week selection) 
     st.sidebar.header("🔍 Filtros")
     
     # Week filter (moved up to be available for title)
@@ -279,7 +279,6 @@ def main():
     st.title("📊 Control de Seguimiento")
     week_range_text = get_week_range_spanish(selected_week)
     st.markdown(f"### {week_range_text}")
-    st.markdown("Dashboard para monitoreo de fechas límite y acciones pendientes")
     
     # Show data loading success
     st.success(f"✅ Datos cargados: {len(df)} registros")
