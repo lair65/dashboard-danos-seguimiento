@@ -46,39 +46,101 @@ def format_date_spanish(date):
     month = spanish_months[date.month]
     return f"{day} de {month}"
 
-def get_week_range_spanish(week_type):
-    """Get week range formatted in Spanish based on week type"""
+def get_period_range_spanish(period_type):
+    """Get period range formatted in Spanish based on period type"""
     today = datetime.now()
     current_week_start, current_week_end = get_week_range(today)
-    past_week_start = current_week_start - timedelta(days=7)
-    past_week_end = current_week_start - timedelta(days=1)
     
-    if week_type == "Semana en Curso":
+    if period_type == "Semana en Curso":
         start_str = format_date_spanish(current_week_start)
         end_str = format_date_spanish(current_week_end)
         return f"{start_str} al {end_str}"
-    elif week_type == "Semana Pasada":
+    elif period_type == "Semana Pasada":
+        past_week_start = current_week_start - timedelta(days=7)
+        past_week_end = current_week_start - timedelta(days=1)
         start_str = format_date_spanish(past_week_start)
         end_str = format_date_spanish(past_week_end)
         return f"{start_str} al {end_str}"
-    else:  # Both weeks
+    elif period_type == "1 Semana Adelante":
+        future_week_start = current_week_end + timedelta(days=1)
+        future_week_end = future_week_start + timedelta(days=6)
+        start_str = format_date_spanish(future_week_start)
+        end_str = format_date_spanish(future_week_end)
+        return f"{start_str} al {end_str}"
+    elif period_type == "2 Semanas Pasadas":
+        two_weeks_past_start = current_week_start - timedelta(days=14)
+        two_weeks_past_end = current_week_start - timedelta(days=1)
+        start_str = format_date_spanish(two_weeks_past_start)
+        end_str = format_date_spanish(two_weeks_past_end)
+        return f"{start_str} al {end_str}"
+    elif period_type == "2 Semanas Adelante":
+        two_weeks_future_start = current_week_end + timedelta(days=1)
+        two_weeks_future_end = current_week_end + timedelta(days=14)
+        start_str = format_date_spanish(two_weeks_future_start)
+        end_str = format_date_spanish(two_weeks_future_end)
+        return f"{start_str} al {end_str}"
+    elif period_type == "Mes Pasado":
+        last_month = today.replace(day=1) - timedelta(days=1)
+        month_start = last_month.replace(day=1)
+        start_str = format_date_spanish(month_start)
+        end_str = format_date_spanish(last_month)
+        return f"{start_str} al {end_str}"
+    elif period_type == "Mes Actual":
+        month_start = today.replace(day=1)
+        next_month = month_start + timedelta(days=32)
+        month_end = next_month.replace(day=1) - timedelta(days=1)
+        start_str = format_date_spanish(month_start)
+        end_str = format_date_spanish(month_end)
+        return f"{start_str} al {end_str}"
+    elif period_type == "1 Mes Adelante":
+        next_month_start = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+        month_after = next_month_start + timedelta(days=32)
+        next_month_end = month_after.replace(day=1) - timedelta(days=1)
+        start_str = format_date_spanish(next_month_start)
+        end_str = format_date_spanish(next_month_end)
+        return f"{start_str} al {end_str}"
+    else:  # Both weeks (legacy)
+        past_week_start = current_week_start - timedelta(days=7)
         start_str = format_date_spanish(past_week_start)
         end_str = format_date_spanish(current_week_end)
         return f"{start_str} al {end_str}"
 
-def filter_by_week(df, week_type, base_column):
-    """Filter dataframe by week type using specified base column"""
+def filter_by_period(df, period_type, base_column):
+    """Filter dataframe by period type using specified base column"""
     today = datetime.now()
     current_week_start, current_week_end = get_week_range(today)
-    past_week_start = current_week_start - timedelta(days=7)
-    past_week_end = current_week_start - timedelta(days=1)
     
-    if week_type == "Semana en Curso":
-        return df[(df[base_column] >= current_week_start) & (df[base_column] <= current_week_end)]
-    elif week_type == "Semana Pasada":
-        return df[(df[base_column] >= past_week_start) & (df[base_column] <= past_week_end)]
-    else:  # Both weeks
-        return df[(df[base_column] >= past_week_start) & (df[base_column] <= current_week_end)]
+    if period_type == "Semana en Curso":
+        start_date, end_date = current_week_start, current_week_end
+    elif period_type == "Semana Pasada":
+        start_date = current_week_start - timedelta(days=7)
+        end_date = current_week_start - timedelta(days=1)
+    elif period_type == "1 Semana Adelante":
+        start_date = current_week_end + timedelta(days=1)
+        end_date = start_date + timedelta(days=6)
+    elif period_type == "2 Semanas Pasadas":
+        start_date = current_week_start - timedelta(days=14)
+        end_date = current_week_start - timedelta(days=1)
+    elif period_type == "2 Semanas Adelante":
+        start_date = current_week_end + timedelta(days=1)
+        end_date = current_week_end + timedelta(days=14)
+    elif period_type == "Mes Pasado":
+        last_month = today.replace(day=1) - timedelta(days=1)
+        start_date = last_month.replace(day=1)
+        end_date = last_month
+    elif period_type == "Mes Actual":
+        start_date = today.replace(day=1)
+        next_month = start_date + timedelta(days=32)
+        end_date = next_month.replace(day=1) - timedelta(days=1)
+    elif period_type == "1 Mes Adelante":
+        start_date = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+        month_after = start_date + timedelta(days=32)
+        end_date = month_after.replace(day=1) - timedelta(days=1)
+    else:  # Both weeks (legacy)
+        start_date = current_week_start - timedelta(days=7)
+        end_date = current_week_end
+    
+    return df[(df[base_column] >= start_date) & (df[base_column] <= end_date)]
 
 def get_missing_dates(df, column_pairs):
     """Get records with missing dates in executive columns based on column pairs"""
@@ -133,16 +195,97 @@ def get_missing_dates(df, column_pairs):
 
 def create_executive_summary(df):
     """Create executive performance summary"""
-    summary = df.groupby('Ejecutivo').agg({
+    # Create a copy and convert PrimaNeta back to numeric for aggregation
+    df_copy = df.copy()
+    df_copy['PrimaNeta_numeric'] = df_copy['PrimaNeta'].str.replace('$', '').str.replace(',', '').astype(float)
+    
+    summary = df_copy.groupby('Ejecutivo').agg({
         'ID': 'count',
         'Cliente': 'nunique',
-        'PrimaNeta': 'sum'
+        'PrimaNeta_numeric': 'sum'
     }).round(2)
     
     summary.columns = ['Casos Pendientes', 'Clientes Únicos', 'Prima Neta Total']
     summary['Prima Neta Total'] = summary['Prima Neta Total'].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "$0.00")
     
     return summary.sort_values('Casos Pendientes', ascending=False)
+
+def get_all_records_for_process(df, base_column, exec_column, selected_period, selected_executive):
+    """Get ALL records for a specific process with color coding"""
+    # Filter by period
+    period_filtered = filter_by_period(df, selected_period, base_column)
+    
+    # Filter by executive if selected
+    if selected_executive != 'Todos':
+        period_filtered = period_filtered[period_filtered['Ejecutivo'] == selected_executive]
+    
+    if period_filtered.empty:
+        return pd.DataFrame()
+    
+    # Process ALL records (not just missing ones)
+    today = datetime.now().date()  # Use date only, ignore time
+    processed_data = []
+    
+    for idx, row in period_filtered.iterrows():
+        base_date = row[base_column]
+        exec_date = row[exec_column]
+        
+        # Calculate status and color coding
+        if pd.notna(exec_date):
+            # Green: Has executive action date
+            status = "Completado"
+            color_priority = "green"
+            formatted_exec_date = exec_date.strftime('%d/%m/%Y')
+        else:
+            # No executive action date
+            if pd.isna(base_date):
+                # Red: No base date available
+                status = "Sin fecha base"
+                color_priority = "red"
+                formatted_exec_date = "Sin acción"
+            else:
+                # Calculate days until deadline (using date only)
+                days_until_deadline = (base_date.date() - today).days
+                
+                if days_until_deadline > 1:
+                    # Yellow: 3+ days remaining
+                    status = f"{days_until_deadline} días restantes"
+                    color_priority = "yellow"
+                else:
+                    # Red: Deadline today or overdue
+                    if days_until_deadline <= 0:
+                        status = f"{abs(days_until_deadline)} días vencido"
+                    else:
+                        status = "Vence hoy" if days_until_deadline == 0 else f"{days_until_deadline} día(s) restante(s)"
+                    color_priority = "red"
+                
+                formatted_exec_date = "Pendiente"
+        
+        # Format base date
+        formatted_base_date = base_date.strftime('%d/%m/%Y') if pd.notna(base_date) else "Sin fecha"
+        
+        # Format PrimaNeta with currency
+        formatted_prima = f"${row['PrimaNeta']:,.2f}" if pd.notna(row['PrimaNeta']) else "$0.00"
+        
+        processed_data.append({
+            'ID': row['ID'],
+            'Cliente': row['Cliente'],
+            'Pólizas': row['Pólizas'],
+            'Fecha Base': formatted_base_date,
+            'Fecha Ejecutivo': formatted_exec_date,
+            'Ejecutivo': row['Ejecutivo'],
+            'SRamoNombre': row['SRamoNombre'],
+            'Status': status,
+            'PrimaNeta': formatted_prima,
+            'Color Priority': color_priority
+        })
+    
+    return pd.DataFrame(processed_data)
+
+
+def get_simple_counter(total_count):
+    """Get simple counter without emojis or colors"""
+    return f"{total_count} registros"
 
 def main():
     # Custom CSS for better dropdown styling
@@ -254,6 +397,72 @@ def main():
         background-color: #374149 !important;
         color: white !important;
     }
+    
+    /* Force dark theme for entire application */
+    .stApp {
+        background-color: #0e1117 !important;
+        color: #fafafa !important;
+    }
+    
+    /* Main content area */
+    .main .block-container {
+        background-color: #0e1117 !important;
+        color: #fafafa !important;
+    }
+    
+    /* Sidebar dark theme */
+    .css-1d391kg {
+        background-color: #262730 !important;
+    }
+    
+    /* Text inputs dark theme */
+    .stTextInput > div > div > input {
+        background-color: #323d45 !important;
+        color: white !important;
+        border: 1px solid #4a5661 !important;
+    }
+    
+    /* Buttons dark theme */
+    .stButton > button {
+        background-color: #323d45 !important;
+        color: white !important;
+        border: 1px solid #4a5661 !important;
+    }
+    
+    .stButton > button:hover {
+        background-color: #3e4a52 !important;
+        border-color: #5a6870 !important;
+    }
+    
+    /* DataFrames dark theme */
+    .stDataFrame {
+        background-color: #262730 !important;
+    }
+    
+    /* Info/Success/Error messages dark theme */
+    .stAlert {
+        background-color: #323d45 !important;
+        color: white !important;
+        border: 1px solid #4a5661 !important;
+    }
+    
+    /* Headers and text dark theme */
+    h1, h2, h3, h4, h5, h6 {
+        color: #fafafa !important;
+    }
+    
+    /* Force all text to be light colored */
+    .stMarkdown, .stText, p, div, span, label {
+        color: #fafafa !important;
+    }
+    
+    /* Metrics containers */
+    [data-testid="metric-container"] {
+        background-color: #323d45 !important;
+        border: 1px solid #4a5661 !important;
+        padding: 10px !important;
+        border-radius: 8px !important;
+    }
     </style>
     """, unsafe_allow_html=True)
     
@@ -264,129 +473,142 @@ def main():
         st.error(f"❌ Error al cargar datos: {e}")
         return
     
-    # Sidebar filters (moved before title to get week selection) 
+    # Sidebar filters
     st.sidebar.header("🔍 Filtros")
     
-    # Week filter (moved up to be available for title)
-    week_options = ["Semana en Curso", "Semana Pasada", "Amabas Semanas"]
-    selected_week = st.sidebar.selectbox("📅 Período", week_options)
+    # Period filter with 8 options
+    period_options = [
+        "Semana en Curso", "Semana Pasada", "1 Semana Adelante",
+        "2 Semanas Pasadas", "2 Semanas Adelante", 
+        "Mes Pasado", "Mes Actual", "1 Mes Adelante"
+    ]
+    selected_period = st.sidebar.selectbox("📅 Período", period_options)
     
     # Executive filter
     executives = ['Todos'] + sorted(df['Ejecutivo'].dropna().unique().tolist())
     selected_executive = st.sidebar.selectbox("👤 Ejecutivo", executives)
     
-    # Dynamic title based on week selection
+    # Dynamic title based on period selection
     st.title("📊 Control de Seguimiento")
-    week_range_text = get_week_range_spanish(selected_week)
-    st.markdown(f"### {week_range_text}")
+    period_range_text = get_period_range_spanish(selected_period)
+    st.markdown(f"### {period_range_text}")
     
     # Show data loading success
-    st.success(f"✅ Datos cargados: {len(df)} registros")
+    st.success(f"Datos cargados: {len(df)} registros")
     
-    # Action columns filter - show as pairs
-    column_pairs = {
+    # Process definitions - all processes displayed
+    processes = {
         'FEnvío Cap': 'Ejecutivo Fcap',
         'Carta cobertura': 'Ejecutivo 5 días',
         '30 Días Pres. Cliente': 'Ejecutivo 30 días',
         '69 Días Sol. Aseguradora': 'Ejecutivo 69 días'
     }
     
-    selected_base_columns = st.sidebar.multiselect(
-        "📋 Procesos a Monitorear", 
-        list(column_pairs.keys()), 
-        default=list(column_pairs.keys())
-    )
+    # First, collect all data for global summary
+    all_process_data = []
+    for process_name, exec_column in processes.items():
+        process_data = get_all_records_for_process(df, process_name, exec_column, selected_period, selected_executive)
+        if not process_data.empty:
+            all_process_data.append(process_data)
     
-    # Create the pairs dictionary for selected columns
-    selected_pairs = {base: exec_col for base, exec_col in column_pairs.items() if base in selected_base_columns}
+    # Executive summary section (cleaned up layout)
+    st.markdown("---")
     
-    if not selected_pairs:
-        st.warning("⚠️ Selecciona al menos un proceso para monitorear")
-        return
-    
-    # Filter data by combining all selected base columns
-    all_filtered_dfs = []
-    for base_col in selected_base_columns:
-        week_filtered = filter_by_week(df, selected_week, base_col)
-        if selected_executive != 'Todos':
-            week_filtered = week_filtered[week_filtered['Ejecutivo'] == selected_executive]
-        all_filtered_dfs.append(week_filtered)
-    
-    # Combine all filtered dataframes and remove duplicates
-    if all_filtered_dfs:
-        filtered_df = pd.concat(all_filtered_dfs).drop_duplicates(subset=['ID'])
+    if all_process_data:
+        # Combine all process data for summary
+        combined_df = pd.concat(all_process_data).drop_duplicates(subset=['ID'])
+        
+        # Executive Performance Summary
+        st.subheader("👤 Resumen por Ejecutivo")
+        
+        # Global statistics as small text below the title
+        total_records = len(combined_df)
+        completed_records = len(combined_df[combined_df['Color Priority'] == 'green'])
+        pending_records = len(combined_df[combined_df['Color Priority'].isin(['yellow', 'red'])])
+        
+        st.markdown(f"**Total:** {total_records} registros | **Completados:** {completed_records} | **Pendientes:** {pending_records}")
+        
+        executive_summary = create_executive_summary(combined_df)
+        st.dataframe(executive_summary, use_container_width=True)
+        
+        # Global export
+        if st.button("Exportar Resumen Global"):
+            output_file = f"resumen_global_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+            combined_df.to_excel(output_file, index=False)
+            st.success(f"Archivo exportado: {output_file}")
     else:
-        filtered_df = pd.DataFrame()
+        st.info("No hay datos para mostrar con los filtros seleccionados")
     
-    # Get missing dates
-    missing_df = get_missing_dates(filtered_df, selected_pairs)
-    
-    if missing_df.empty:
-        st.success("🎉 ¡Excelente! No hay acciones pendientes para los filtros seleccionados")
-        return
-    
-    # Executive Performance Summary
-    st.subheader("👤 Resumen por Ejecutivo")
-    executive_summary = create_executive_summary(missing_df)
-    st.dataframe(executive_summary, use_container_width=True)
-    
-    # Detailed table
-    st.subheader("📋 Detalle de Acciones Pendientes")
-    
-    # Search functionality
-    search_term = st.text_input("🔍 Buscar por Cliente o Póliza")
-    
-    display_df = missing_df.copy()
-    if search_term:
-        mask = (display_df['Cliente'].str.contains(search_term, case=False, na=False) | 
-                display_df['Pólizas'].str.contains(search_term, case=False, na=False))
-        display_df = display_df[mask]
-    
-    # Priority highlighting with stronger colors for dark mode
-    def highlight_priority(row):
-        days_delay = row['Días de Retraso']
+    # Display each process in its own section (after global summary)
+    for process_name, exec_column in processes.items():
+        st.markdown("---")  # Separator line
         
-        if days_delay == "Sin fecha":
-            return ['background-color: #dc3545; color: white'] * len(row)  # Strong red for no date
+        # Get ALL data for this specific process (not just missing)
+        process_all_df = get_all_records_for_process(
+            df, process_name, exec_column, selected_period, selected_executive
+        )
         
-        if days_delay > 7:  # Overdue
-            return ['background-color: #dc3545; color: white'] * len(row)  # Strong red
-        elif days_delay > 3:  # Warning
-            return ['background-color: #ffc107; color: black'] * len(row)  # Strong yellow
-        else:  # OK
-            return ['background-color: #28a745; color: white'] * len(row)  # Strong green
+        # Simple counter header
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.subheader(f"📋 {process_name}")
+        with col2:
+            if not process_all_df.empty:
+                counter_text = get_simple_counter(len(process_all_df))
+                st.markdown(f"""
+                <div style="text-align: right; padding: 5px; border: 1px solid #4a5661; 
+                            border-radius: 4px; font-size: 14px; background-color: #323d45; color: white;">
+                    {counter_text}
+                </div>
+                """, unsafe_allow_html=True)
+        
+        if process_all_df.empty:
+            st.info(f"No hay registros para {process_name} en el período seleccionado")
+        else:
+            # Search functionality for this process
+            search_key = f"search_{process_name.replace(' ', '_')}"
+            search_term = st.text_input(
+                f"🔍 Buscar en {process_name}", 
+                key=search_key
+            )
+            
+            display_df = process_all_df.copy()
+            if search_term:
+                mask = (display_df['Cliente'].str.contains(search_term, case=False, na=False) | 
+                        display_df['Pólizas'].str.contains(search_term, case=False, na=False))
+                display_df = display_df[mask]
+            
+            # First remove Color Priority column from display
+            display_columns = [col for col in display_df.columns if col != 'Color Priority']
+            display_df_clean = display_df[display_columns].copy()
+            
+            # Create color mapping based on original data
+            color_mapping = display_df['Color Priority'].to_dict()
+            
+            # Apply styling using the color mapping
+            def highlight_by_priority(row):
+                # Get the color priority from the mapping using the row's index
+                color_priority = color_mapping.get(row.name, '')
+                
+                if color_priority == 'green':
+                    return ['background-color: #28a745; color: white'] * len(row)
+                elif color_priority == 'yellow':
+                    return ['background-color: #ffc107; color: black'] * len(row)
+                elif color_priority == 'red':
+                    return ['background-color: #dc3545; color: white'] * len(row)
+                else:
+                    return [''] * len(row)
+            
+            styled_df = display_df_clean.style.apply(highlight_by_priority, axis=1)
+            st.dataframe(styled_df, use_container_width=True)
+            
+            # Smaller export button without emoji
+            if st.button(f"Exportar {process_name}", key=f"export_{process_name.replace(' ', '_')}"):
+                safe_name = process_name.replace(' ', '_').replace(':', '')
+                output_file = f"reporte_{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+                display_df_clean.to_excel(output_file, index=False)
+                st.success(f"Archivo exportado: {output_file}")
     
-    styled_df = display_df.style.apply(highlight_priority, axis=1)
-    st.dataframe(styled_df, use_container_width=True)
-    
-    # Legend (simplified, without title)
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("🔴 **Rojo**: Más de 7 días de retraso o sin fecha")
-    
-    with col2:
-        st.markdown("🟡 **Amarillo**: 3-7 días de retraso")
-    
-    with col3:
-        st.markdown("🟢 **Verde**: Menos de 3 días de retraso")
-    
-    # Export functionality
-    if st.button("📥 Exportar a Excel"):
-        output_file = f"reporte_pendientes_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-        display_df.to_excel(output_file, index=False)
-        st.success(f"✅ Archivo exportado: {output_file}")
-    
-    # Visualization - Pie chart by branch
-    st.subheader("📊 Distribución por Ramo")
-    branch_counts = missing_df.groupby('SRamoNombre')['ID'].count().reset_index()
-    fig_pie = px.pie(
-        branch_counts, 
-        values='ID', 
-        names='SRamoNombre',
-        title="Distribución por Ramo"
-    )
-    st.plotly_chart(fig_pie, use_container_width=True)
 
 if __name__ == "__main__":
     main()
