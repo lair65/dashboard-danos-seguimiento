@@ -114,7 +114,7 @@ def filter_by_period(df, period_type, base_column):
     """Filter dataframe by period type using specified base column"""
     today = datetime.now()
     current_week_start, current_week_end = get_week_range(today)
-    
+
     if period_type == "Semana en Curso":
         start_date, end_date = current_week_start, current_week_end
     elif period_type == "Semana Pasada":
@@ -144,7 +144,11 @@ def filter_by_period(df, period_type, base_column):
     else:  # Both weeks (legacy)
         start_date = current_week_start - timedelta(days=7)
         end_date = current_week_end
-    
+
+    return df[(df[base_column] >= start_date) & (df[base_column] <= end_date)]
+
+def filter_by_date_range(df, start_date, end_date, base_column):
+    """Filter dataframe by custom date range using specified base column"""
     return df[(df[base_column] >= start_date) & (df[base_column] <= end_date)]
 
 def get_missing_dates(df, column_pairs):
@@ -199,43 +203,153 @@ def get_missing_dates(df, column_pairs):
     return pd.DataFrame(missing_data)
 
 def create_executive_summary(df):
-    """Create executive performance summary"""
-    # Create a copy and convert PrimaNeta back to numeric for aggregation
-    df_copy = df.copy()
-    df_copy['PrimaNeta_numeric'] = df_copy['PrimaNeta'].str.replace('$', '').str.replace(',', '').astype(float)
-    
-    summary = df_copy.groupby('Ejecutivo').agg({
-        'ID': 'count',
-        'Cliente': 'nunique',
-        'PrimaNeta_numeric': 'sum'
-    }).round(2)
-    
-    summary.columns = ['Casos Pendientes', 'Clientes Únicos', 'Prima Neta Total']
-    summary['Prima Neta Total'] = summary['Prima Neta Total'].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "$0.00")
-    
-    return summary.sort_values('Casos Pendientes', ascending=False)
+    """Create executive performance summary with enhanced metrics"""
+    if df.empty:
+        return pd.DataFrame()
 
-def get_all_records_for_process(df, base_column, exec_column, selected_period, selected_executive):
+    # Create a copy for processing
+    df_copy = df.copy()
+
+    # Extract numeric value from PrimaNeta for aggregation
+    def extract_numeric_prima(prima_str):
+        if pd.isna(prima_str):
+            return 0.0
+        # Remove currency symbols and convert to float
+        numeric_str = str(prima_str).replace('USD$', '').replace('$', '').replace(',', '')
+        try:
+            return float(numeric_str)
+        except:
+            return 0.0
+
+    df_copy['PrimaNeta_numeric'] = df_copy['PrimaNeta'].apply(extract_numeric_prima)
+
+    # Calculate timing statistics
+    timing_stats = df_copy.groupby('Ejecutivo')['Estado Tiempo'].value_counts().unstack(fill_value=0)
+
+    # Calculate completion statistics
+    completion_stats = df_copy.groupby('Ejecutivo')['Color Priority'].apply(
+        lambda x: (x == 'green').sum() / len(x) * 100
+    ).round(1)
+
+    # Calculate average response time (only for completed cases)
+    def calculate_avg_response_time(group):
+        completed = group[group['Color Priority'] == 'green']
+        if completed.empty:
+            return 0
+
+        response_times = []
+        for _, row in completed.iterrows():
+            # Find the corresponding base and exec dates from original data
+            base_col = None
+            exec_col = None
+
+            # Determine which process this is based on the data structure
+            # This is a simplified approach - in practice you'd pass this info
+            if 'FEnvío Cap' in df.columns:
+                try:
+                    orig_row = df[df['ID'] == row['ID']].iloc[0]
+                    # Try different process combinations
+                    process_pairs = [
+                        ('FEnvío Cap', 'Ejecutivo Fcap'),
+                        ('Carta cobertura', 'Ejecutivo 5 días'),
+                        ('30 Días Pres. Cliente', 'Ejecutivo 30 días'),
+                        ('69 Días Sol. Aseguradora', 'Ejecutivo 69 días')
+                    ]
+
+                    for base_col, exec_col in process_pairs:
+                        if pd.notna(orig_row[base_col]) and pd.notna(orig_row[exec_col]):
+                            response_time = (orig_row[exec_col] - orig_row[base_col]).days
+                            if response_time >= 0:  # Valid response time
+                                response_times.append(response_time)
+                            break
+                except:
+                    pass
+
+        return round(np.mean(response_times), 1) if response_times else 0
+
+    # Group by executive and calculate all metrics
+    summary_data = []
+    for exec_name in df_copy['Ejecutivo'].unique():
+        exec_data = df_copy[df_copy['Ejecutivo'] == exec_name]
+
+        # Basic counts
+        total_cases = len(exec_data)
+        unique_clients = exec_data['Cliente'].nunique()
+        completed_cases = len(exec_data[exec_data['Color Priority'] == 'green'])
+        completion_rate = round((completed_cases / total_cases * 100), 1) if total_cases > 0 else 0
+
+        # Timing statistics
+        en_tiempo = timing_stats.get('En Tiempo', {}).get(exec_name, 0)
+        retrasadas = timing_stats.get('Retrasado', {}).get(exec_name, 0)
+        pendientes = timing_stats.get('Pendiente', {}).get(exec_name, 0)
+        sin_fecha = timing_stats.get('Sin Fecha Base', {}).get(exec_name, 0)
+
+        # Currency separation
+        usd_data = exec_data[exec_data['Moneda'] == 'Dólares']
+        nacional_data = exec_data[exec_data['Moneda'] == 'Nacional']
+
+        prima_usd = usd_data['PrimaNeta_numeric'].sum()
+        prima_nacional = nacional_data['PrimaNeta_numeric'].sum()
+
+        # Average response time calculation (simplified)
+        avg_response = 0  # Placeholder for now, complex to calculate without process context
+
+        summary_data.append({
+            'Ejecutivo': exec_name,
+            'Total Casos': total_cases,
+            'Clientes Únicos': unique_clients,
+            'En Tiempo': en_tiempo,
+            'Retrasadas': retrasadas,
+            'Pendientes': pendientes + sin_fecha,
+            '% Completado': completion_rate,
+            'Prima USD': f"${prima_usd:,.2f}" if prima_usd > 0 else "$0.00",
+            'Prima Nacional': f"${prima_nacional:,.2f}" if prima_nacional > 0 else "$0.00"
+        })
+
+    summary_df = pd.DataFrame(summary_data)
+    summary_df = summary_df.set_index('Ejecutivo')
+
+    return summary_df.sort_values('Total Casos', ascending=False)
+
+def get_all_records_for_process(df, base_column, exec_column, selected_period, selected_executive, use_calendar=False, start_date=None, end_date=None):
     """Get ALL records for a specific process with color coding"""
-    # Filter by period
-    period_filtered = filter_by_period(df, selected_period, base_column)
-    
+    # Filter by period or date range
+    if use_calendar and start_date and end_date:
+        period_filtered = filter_by_date_range(df, start_date, end_date, base_column)
+    else:
+        period_filtered = filter_by_period(df, selected_period, base_column)
+
     # Filter by executive if selected
     if selected_executive != 'Todos':
         period_filtered = period_filtered[period_filtered['Ejecutivo'] == selected_executive]
-    
+
     if period_filtered.empty:
         return pd.DataFrame()
-    
+
     # Process ALL records (not just missing ones)
     today = datetime.now().date()  # Use date only, ignore time
     processed_data = []
-    
+
     for idx, row in period_filtered.iterrows():
         base_date = row[base_column]
         exec_date = row[exec_column]
-        
-        # Calculate status and color coding
+
+        # Determine timing status for new column
+        if pd.notna(exec_date) and pd.notna(base_date):
+            if exec_date.date() <= base_date.date():
+                timing_status = "En Tiempo"
+                timing_color = "green"
+            else:
+                timing_status = "Retrasado"
+                timing_color = "red"
+        elif pd.notna(exec_date) and pd.isna(base_date):
+            timing_status = "Sin Fecha Base"
+            timing_color = "yellow"
+        else:
+            timing_status = "Pendiente"
+            timing_color = "yellow"
+
+        # Calculate status and color coding (existing logic)
         if pd.notna(exec_date):
             # Green: Has executive action date
             status = "Completado"
@@ -251,7 +365,7 @@ def get_all_records_for_process(df, base_column, exec_column, selected_period, s
             else:
                 # Calculate days until deadline (using date only)
                 days_until_deadline = (base_date.date() - today).days
-                
+
                 if days_until_deadline > 1:
                     # Yellow: 3+ days remaining
                     status = f"{days_until_deadline} días restantes"
@@ -263,28 +377,33 @@ def get_all_records_for_process(df, base_column, exec_column, selected_period, s
                     else:
                         status = "Vence hoy" if days_until_deadline == 0 else f"{days_until_deadline} día(s) restante(s)"
                     color_priority = "red"
-                
+
                 formatted_exec_date = "Pendiente"
-        
+
         # Format base date
         formatted_base_date = base_date.strftime('%d/%m/%Y') if pd.notna(base_date) else "Sin fecha"
-        
-        # Format PrimaNeta with currency
-        formatted_prima = f"${row['PrimaNeta']:,.2f}" if pd.notna(row['PrimaNeta']) else "$0.00"
-        
+
+        # Format PrimaNeta with currency symbol
+        currency = row.get('Moneda', 'Nacional')
+        currency_symbol = '$' if currency == 'Nacional' else 'USD$'
+        formatted_prima = f"{currency_symbol}{row['PrimaNeta']:,.2f}" if pd.notna(row['PrimaNeta']) else f"{currency_symbol}0.00"
+
         processed_data.append({
             'ID': row['ID'],
             'Cliente': row['Cliente'],
             'Pólizas': row['Pólizas'],
             'Fecha Base': formatted_base_date,
             'Fecha Ejecutivo': formatted_exec_date,
+            'Estado Tiempo': timing_status,
             'Ejecutivo': row['Ejecutivo'],
+            'PrimaNeta': formatted_prima,
+            'Moneda': currency,
             'SRamoNombre': row['SRamoNombre'],
             'Status': status,
-            'PrimaNeta': formatted_prima,
-            'Color Priority': color_priority
+            'Color Priority': color_priority,
+            'Timing Color': timing_color
         })
-    
+
     return pd.DataFrame(processed_data)
 
 
@@ -812,9 +931,40 @@ def main():
     .stMarkdown {
         color: #374151 !important;
     }
-    
+
     .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
         color: #1e40af !important;
+    }
+
+    /* Make date picker calendar pop-up smaller and more compact */
+    .stDateInput [data-baseweb="calendar"] {
+        transform: scale(0.85) !important;
+        transform-origin: top left !important;
+        max-width: 280px !important;
+        font-size: 0.875rem !important;
+    }
+
+    .stDateInput [data-baseweb="calendar"] table {
+        font-size: 0.8rem !important;
+    }
+
+    .stDateInput [data-baseweb="calendar"] th,
+    .stDateInput [data-baseweb="calendar"] td {
+        padding: 4px !important;
+        min-width: 28px !important;
+        height: 28px !important;
+        font-size: 0.75rem !important;
+    }
+
+    /* Make calendar header smaller */
+    .stDateInput [data-baseweb="calendar"] [role="button"] {
+        font-size: 0.875rem !important;
+        padding: 2px 8px !important;
+    }
+
+    /* Reduce calendar popup container size */
+    .stDateInput [data-baseweb="popover"] {
+        max-width: 300px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -828,27 +978,60 @@ def main():
     
     # Sidebar filters
     st.sidebar.header("🔍 Filtros")
-    
-    # Period filter with 8 options
-    period_options = [
-        "Semana en Curso", "Semana Pasada", "1 Semana Adelante",
-        "2 Semanas Pasadas", "2 Semanas Adelante", 
-        "Mes Pasado", "Mes Actual", "1 Mes Adelante"
-    ]
-    selected_period = st.sidebar.selectbox("📅 Período", period_options)
-    
-    # Executive filter
+
+    # Calendar vs Period selection
+    use_calendar = st.sidebar.checkbox("📅 Usar Rango de Fechas Personalizado")
+
+    # Date range inputs (only show if calendar is enabled)
+    start_date = None
+    end_date = None
+    selected_period = None
+
+    if use_calendar:
+        start_date = st.sidebar.date_input("Fecha Inicio", value=datetime.now() - timedelta(days=30))
+        end_date = st.sidebar.date_input("Fecha Fin", value=datetime.now() + timedelta(days=30))
+
+        # Convert to datetime
+        start_date = datetime.combine(start_date, datetime.min.time())
+        end_date = datetime.combine(end_date, datetime.min.time())
+    else:
+        # Period filter with 8 options (only show if calendar is disabled)
+        period_options = [
+            "Semana en Curso", "Semana Pasada", "1 Semana Adelante",
+            "2 Semanas Pasadas", "2 Semanas Adelante",
+            "Mes Pasado", "Mes Actual", "1 Mes Adelante"
+        ]
+        selected_period = st.sidebar.selectbox("📅 Período", period_options)
+
+    # Executive filter (always available)
     executives = ['Todos'] + sorted(df['Ejecutivo'].dropna().unique().tolist())
     selected_executive = st.sidebar.selectbox("👤 Ejecutivo", executives)
+
+    # Color legend explanation
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**🎨 Leyenda de Colores**")
+    st.sidebar.markdown("""
+    **En las tablas de procesos:**
+    - 🟢 **Verde**: Casos completados
+    - 🟡 **Amarillo**: Casos con tiempo restante (>1 día)
+    - 🔴 **Rojo**: Casos vencidos o que vencen hoy
+    """)
     
-    # Dynamic title based on period selection
+    # Dynamic title based on selection
     st.title("📊 Control de Seguimiento")
-    period_range_text = get_period_range_spanish(selected_period)
+
+    if use_calendar and start_date and end_date:
+        period_range_text = f"{start_date.strftime('%d/%m/%Y')} al {end_date.strftime('%d/%m/%Y')}"
+    elif selected_period:
+        period_range_text = get_period_range_spanish(selected_period)
+    else:
+        period_range_text = "Rango de fechas no seleccionado"
+
     st.markdown(f"### {period_range_text}")
-    
+
     # Show data loading success
     st.success(f"Datos cargados: {len(df)} registros")
-    
+
     # Process definitions - all processes displayed
     processes = {
         'FEnvío Cap': 'Ejecutivo Fcap',
@@ -856,11 +1039,14 @@ def main():
         '30 Días Pres. Cliente': 'Ejecutivo 30 días',
         '69 Días Sol. Aseguradora': 'Ejecutivo 69 días'
     }
-    
+
     # First, collect all data for global summary
     all_process_data = []
     for process_name, exec_column in processes.items():
-        process_data = get_all_records_for_process(df, process_name, exec_column, selected_period, selected_executive)
+        process_data = get_all_records_for_process(
+            df, process_name, exec_column, selected_period, selected_executive,
+            use_calendar, start_date, end_date
+        )
         if not process_data.empty:
             all_process_data.append(process_data)
     
@@ -873,14 +1059,27 @@ def main():
         
         # Executive Performance Summary
         st.subheader("👤 Resumen por Ejecutivo")
-        
+
         # Global statistics as small text below the title
         total_records = len(combined_df)
         completed_records = len(combined_df[combined_df['Color Priority'] == 'green'])
         pending_records = len(combined_df[combined_df['Color Priority'].isin(['yellow', 'red'])])
-        
+
+        # Calculate global percentages
+        completion_percentage = round((completed_records / total_records * 100), 1) if total_records > 0 else 0
+        pending_percentage = round((pending_records / total_records * 100), 1) if total_records > 0 else 0
+
         st.markdown(f"**Total:** {total_records} registros | **Completados:** {completed_records} | **Pendientes:** {pending_records}")
-        
+
+        # Global percentage section
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("% Global Completado", f"{completion_percentage}%")
+        with col2:
+            st.metric("% Global Pendiente", f"{pending_percentage}%")
+        with col3:
+            st.metric("Total Registros", total_records)
+
         executive_summary = create_executive_summary(combined_df)
         st.dataframe(executive_summary, use_container_width=True)
         
@@ -898,7 +1097,8 @@ def main():
         
         # Get ALL data for this specific process (not just missing)
         process_all_df = get_all_records_for_process(
-            df, process_name, exec_column, selected_period, selected_executive
+            df, process_name, exec_column, selected_period, selected_executive,
+            use_calendar, start_date, end_date
         )
         
         # Simple counter header
@@ -931,18 +1131,20 @@ def main():
                         display_df['Pólizas'].str.contains(search_term, case=False, na=False))
                 display_df = display_df[mask]
             
-            # First remove Color Priority column from display
-            display_columns = [col for col in display_df.columns if col != 'Color Priority']
+            # Remove internal columns from display
+            display_columns = [col for col in display_df.columns if col not in ['Color Priority', 'Timing Color']]
             display_df_clean = display_df[display_columns].copy()
-            
+
             # Create color mapping based on original data
             color_mapping = display_df['Color Priority'].to_dict()
-            
-            # Apply styling using the color mapping - More intense colors
+            timing_color_mapping = display_df['Timing Color'].to_dict()
+
+            # Apply styling using the color mapping - Uniform row colors
             def highlight_by_priority(row):
                 # Get the color priority from the mapping using the row's index
                 color_priority = color_mapping.get(row.name, '')
-                
+
+                # Apply uniform styling to entire row based on overall priority
                 if color_priority == 'green':
                     return ['background-color: #dcfce7; color: #14532d; border-left: 4px solid #16a34a; font-weight: 600'] * len(row)
                 elif color_priority == 'yellow':
@@ -951,7 +1153,7 @@ def main():
                     return ['background-color: #fee2e2; color: #991b1b; border-left: 4px solid #dc2626; font-weight: 600'] * len(row)
                 else:
                     return [''] * len(row)
-            
+
             styled_df = display_df_clean.style.apply(highlight_by_priority, axis=1)
             st.dataframe(styled_df, use_container_width=True)
             
