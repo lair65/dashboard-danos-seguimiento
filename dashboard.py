@@ -26,7 +26,7 @@ def load_data():
     df['Ejecutivo'] = df['Ejecutivo'].str.strip()
     
     # Convert date columns to datetime
-    date_columns = ['FEnvío Cap', 'Carta cobertura', '30 Días Pres. Cliente', '69 Días Sol. Aseguradora', 
+    date_columns = ['FEnvío Cap', 'Carta cobertura', '30 Días Pres. Cliente', '69 Días Sol. Aseguradora',
                    'Ejecutivo Fcap', 'Ejecutivo 5 días', 'Ejecutivo 30 días', 'Ejecutivo 69 días']
     for col in date_columns:
         df[col] = pd.to_datetime(df[col], errors='coerce')
