@@ -13,7 +13,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-@st.cache_data
 def load_data():
     """Load and preprocess the Excel data"""
     df = pd.read_excel("reporte_danos.xlsx")
