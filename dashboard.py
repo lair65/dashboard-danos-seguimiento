@@ -4,6 +4,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
+from io import BytesIO
 
 # Page config - Force light theme
 st.set_page_config(
@@ -188,7 +189,7 @@ def get_missing_dates(df, column_pairs):
                 formatted_base_date = base_date.strftime('%d/%m/%Y') if pd.notnull(base_date) else "Sin fecha"
             
             missing_data.append({
-                'ID': row['ID'],
+                'ID': int(row['ID']) if pd.notna(row['ID']) else 0,
                 'Cliente': row['Cliente'],
                 'Pólizas': row['Pólizas'],
                 'Fecha Base': formatted_base_date,
@@ -388,7 +389,7 @@ def get_all_records_for_process(df, base_column, exec_column, selected_period, s
         formatted_prima = f"{currency_symbol}{row['PrimaNeta']:,.2f}" if pd.notna(row['PrimaNeta']) else f"{currency_symbol}0.00"
 
         processed_data.append({
-            'ID': row['ID'],
+            'ID': int(row['ID']) if pd.notna(row['ID']) else 0,
             'Cliente': row['Cliente'],
             'Pólizas': row['Pólizas'],
             'Fecha Base': formatted_base_date,
@@ -1081,12 +1082,18 @@ def main():
 
         executive_summary = create_executive_summary(combined_df)
         st.dataframe(executive_summary, use_container_width=True)
-        
-        # Global export
-        if st.button("Exportar"):
-            output_file = f"resumen_global_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-            combined_df.to_excel(output_file, index=False)
-            st.success(f"Archivo exportado: {output_file}")
+
+        # Global export with download button using BytesIO (no disk write)
+        output = BytesIO()
+        combined_df.to_excel(output, index=False, engine='openpyxl')
+        output.seek(0)
+
+        st.download_button(
+            label="Exportar",
+            data=output,
+            file_name=f"resumen_global_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
     else:
         st.info("No hay datos para mostrar con los filtros seleccionados")
     
@@ -1155,13 +1162,20 @@ def main():
 
             styled_df = display_df_clean.style.apply(highlight_by_priority, axis=1)
             st.dataframe(styled_df, use_container_width=True)
-            
-            # Smaller export button without emoji
-            if st.button("Exportar", key=f"export_{process_name.replace(' ', '_')}"):
-                safe_name = process_name.replace(' ', '_').replace(':', '')
-                output_file = f"reporte_{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-                display_df_clean.to_excel(output_file, index=False)
-                st.success(f"Archivo exportado: {output_file}")
+
+            # Export with download button using BytesIO (no disk write)
+            safe_name = process_name.replace(' ', '_').replace(':', '')
+            output = BytesIO()
+            display_df_clean.to_excel(output, index=False, engine='openpyxl')
+            output.seek(0)
+
+            st.download_button(
+                label="Exportar",
+                data=output,
+                file_name=f"reporte_{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"export_{process_name.replace(' ', '_')}"
+            )
     
 
 if __name__ == "__main__":
