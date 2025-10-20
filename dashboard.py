@@ -27,7 +27,9 @@ def load_data():
     
     # Convert date columns to datetime
     date_columns = ['FEnvío Cap', 'Carta cobertura', '30 Días Pres. Cliente', '69 Días Sol. Aseguradora',
-                   'Ejecutivo Fcap', 'Ejecutivo 5 días', 'Ejecutivo 30 días', 'Ejecutivo 69 días']
+                   'Ejecutivo Fcap', 'Ejecutivo 5 días', 'Ejecutivo 30 días', 'Ejecutivo 69 días',
+                   '74 Días Recepcion de  Info. Del cliente', 'Ejecutivo 74 días ', '89 Días Env. Info, al cliente',
+                   'Ejecutivo 89 días', '100 Días Solicitud Siniestralidad', 'Ejecutivo 100 días']
     for col in date_columns:
         df[col] = pd.to_datetime(df[col], errors='coerce')
     
@@ -144,7 +146,7 @@ def filter_by_period(df, period_type, base_column):
     else:  # Both weeks (legacy)
         start_date = current_week_start - timedelta(days=7)
         end_date = current_week_end
-
+    end_date = end_date.replace(hour=23, minute=59, second=59)
     return df[(df[base_column] >= start_date) & (df[base_column] <= end_date)]
 
 def filter_by_date_range(df, start_date, end_date, base_column):
@@ -160,7 +162,10 @@ def get_missing_dates(df, column_pairs):
         'FEnvío Cap': 'Ejecutivo Fcap',
         'Carta cobertura': 'Ejecutivo 5 días',
         '30 Días Pres. Cliente': 'Ejecutivo 30 días',
-        '69 Días Sol. Aseguradora': 'Ejecutivo 69 días'
+        '69 Días Sol. Aseguradora': 'Ejecutivo 69 días',
+        '74 Días Recepcion de  Info. Del cliente': 'Ejecutivo 74 días ',
+        '89 Días Env. Info, al cliente': 'Ejecutivo 89 días',
+        '100 Días Solicitud Siniestralidad': 'Ejecutivo 100 días'
     }
     
     for idx, row in df.iterrows():
@@ -253,7 +258,10 @@ def create_executive_summary(df):
                         ('FEnvío Cap', 'Ejecutivo Fcap'),
                         ('Carta cobertura', 'Ejecutivo 5 días'),
                         ('30 Días Pres. Cliente', 'Ejecutivo 30 días'),
-                        ('69 Días Sol. Aseguradora', 'Ejecutivo 69 días')
+                        ('69 Días Sol. Aseguradora', 'Ejecutivo 69 días'),
+                        ('74 Días Recepcion de  Info. Del cliente', 'Ejecutivo 74 días '),
+                        ('89 Días Env. Info, al cliente', 'Ejecutivo 89 días'),
+                        ('100 Días Solicitud Siniestralidad', 'Ejecutivo 100 días')
                     ]
 
                     for base_col, exec_col in process_pairs:
@@ -993,7 +1001,7 @@ def main():
 
         # Convert to datetime
         start_date = datetime.combine(start_date, datetime.min.time())
-        end_date = datetime.combine(end_date, datetime.min.time())
+        end_date = datetime.combine(end_date, datetime.min.time()).replace(hour=23, minute=59, second=59)
     else:
         # Period filter with 8 options (only show if calendar is disabled)
         period_options = [
@@ -1018,7 +1026,7 @@ def main():
     """)
     
     # Dynamic title based on selection
-    st.title("📊 Control de Seguimiento")
+    st.title("Control de Seguimiento")
 
     if use_calendar and start_date and end_date:
         period_range_text = f"{start_date.strftime('%d/%m/%Y')} al {end_date.strftime('%d/%m/%Y')}"
@@ -1037,7 +1045,10 @@ def main():
         'FEnvío Cap': 'Ejecutivo Fcap',
         'Carta cobertura': 'Ejecutivo 5 días',
         '30 Días Pres. Cliente': 'Ejecutivo 30 días',
-        '69 Días Sol. Aseguradora': 'Ejecutivo 69 días'
+        '69 Días Sol. Aseguradora': 'Ejecutivo 69 días',
+        '74 Días Recepcion de  Info. Del cliente': 'Ejecutivo 74 días ',
+        '89 Días Env. Info, al cliente': 'Ejecutivo 89 días',
+        '100 Días Solicitud Siniestralidad': 'Ejecutivo 100 días'
     }
 
     # First, collect all data for global summary
@@ -1099,83 +1110,73 @@ def main():
     
     # Display each process in its own section (after global summary)
     for process_name, exec_column in processes.items():
-        st.markdown("---")  # Separator line
-        
-        # Get ALL data for this specific process (not just missing)
+        # Get ALL data for this specific process to get the count for the expander title
         process_all_df = get_all_records_for_process(
             df, process_name, exec_column, selected_period, selected_executive,
             use_calendar, start_date, end_date
         )
         
-        # Simple counter header
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.subheader(f"📋 {process_name}")
-        with col2:
-            if not process_all_df.empty:
-                counter_text = get_simple_counter(len(process_all_df))
-                st.markdown(f"""
-                <div style="text-align: right; padding: 8px 12px; border: 1px solid #d1d5db; 
-                            border-radius: 6px; font-size: 13px; background-color: #f1f5f9; color: #374151; font-weight: 600;">
-                    {counter_text}
-                </div>
-                """, unsafe_allow_html=True)
-        
-        if process_all_df.empty:
-            st.info(f"No hay registros para {process_name} en el período seleccionado")
-        else:
-            # Search functionality for this process
-            search_key = f"search_{process_name.replace(' ', '_')}"
-            search_term = st.text_input(
-                f"🔍 Buscar en {process_name}", 
-                key=search_key
-            )
+        # Create the title with the count in a subtle way
+        expander_title = f"📋 {process_name}  |  {len(process_all_df)} registros"
+
+        with st.expander(expander_title, expanded=True):
+            st.markdown("---")  # Separator line
             
-            display_df = process_all_df.copy()
-            if search_term:
-                mask = (display_df['Cliente'].str.contains(search_term, case=False, na=False) | 
-                        display_df['Pólizas'].str.contains(search_term, case=False, na=False))
-                display_df = display_df[mask]
-            
-            # Remove internal columns from display
-            display_columns = [col for col in display_df.columns if col not in ['Color Priority', 'Timing Color']]
-            display_df_clean = display_df[display_columns].copy()
+            if process_all_df.empty:
+                st.info(f"No hay registros para {process_name} en el período seleccionado")
+            else:
+                # Search functionality for this process
+                search_key = f"search_{process_name.replace(' ', '_')}"
+                search_term = st.text_input(
+                    f"🔍 Buscar en {process_name}", 
+                    key=search_key
+                )
+                
+                display_df = process_all_df.copy()
+                if search_term:
+                    mask = (display_df['Cliente'].str.contains(search_term, case=False, na=False) | 
+                            display_df['Pólizas'].str.contains(search_term, case=False, na=False))
+                    display_df = display_df[mask]
+                
+                # Remove internal columns from display
+                display_columns = [col for col in display_df.columns if col not in ['Color Priority', 'Timing Color']]
+                display_df_clean = display_df[display_columns].copy()
 
-            # Create color mapping based on original data
-            color_mapping = display_df['Color Priority'].to_dict()
-            timing_color_mapping = display_df['Timing Color'].to_dict()
+                # Create color mapping based on original data
+                color_mapping = display_df['Color Priority'].to_dict()
+                timing_color_mapping = display_df['Timing Color'].to_dict()
 
-            # Apply styling using the color mapping - Uniform row colors
-            def highlight_by_priority(row):
-                # Get the color priority from the mapping using the row's index
-                color_priority = color_mapping.get(row.name, '')
+                # Apply styling using the color mapping - Uniform row colors
+                def highlight_by_priority(row):
+                    # Get the color priority from the mapping using the row's index
+                    color_priority = color_mapping.get(row.name, '')
 
-                # Apply uniform styling to entire row based on overall priority
-                if color_priority == 'green':
-                    return ['background-color: #dcfce7; color: #14532d; border-left: 4px solid #16a34a; font-weight: 600'] * len(row)
-                elif color_priority == 'yellow':
-                    return ['background-color: #fef3c7; color: #92400e; border-left: 4px solid #d97706; font-weight: 600'] * len(row)
-                elif color_priority == 'red':
-                    return ['background-color: #fee2e2; color: #991b1b; border-left: 4px solid #dc2626; font-weight: 600'] * len(row)
-                else:
-                    return [''] * len(row)
+                    # Apply uniform styling to entire row based on overall priority
+                    if color_priority == 'green':
+                        return ['background-color: #dcfce7; color: #14532d; border-left: 4px solid #16a34a; font-weight: 600'] * len(row)
+                    elif color_priority == 'yellow':
+                        return ['background-color: #fef3c7; color: #92400e; border-left: 4px solid #d97706; font-weight: 600'] * len(row)
+                    elif color_priority == 'red':
+                        return ['background-color: #fee2e2; color: #991b1b; border-left: 4px solid #dc2626; font-weight: 600'] * len(row)
+                    else:
+                        return [''] * len(row)
 
-            styled_df = display_df_clean.style.apply(highlight_by_priority, axis=1)
-            st.dataframe(styled_df, use_container_width=True)
+                styled_df = display_df_clean.style.apply(highlight_by_priority, axis=1)
+                st.dataframe(styled_df, use_container_width=True)
 
-            # Export with download button using BytesIO (no disk write)
-            safe_name = process_name.replace(' ', '_').replace(':', '')
-            output = BytesIO()
-            display_df_clean.to_excel(output, index=False, engine='openpyxl')
-            output.seek(0)
+                # Export with download button using BytesIO (no disk write)
+                safe_name = process_name.replace(' ', '_').replace(':', '')
+                output = BytesIO()
+                display_df_clean.to_excel(output, index=False, engine='openpyxl')
+                output.seek(0)
 
-            st.download_button(
-                label="Exportar",
-                data=output,
-                file_name=f"reporte_{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"export_{process_name.replace(' ', '_')}"
-            )
+                st.download_button(
+                    label="Exportar",
+                    data=output,
+                    file_name=f"reporte_{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"export_{process_name.replace(' ', '_')}"
+                )
     
 
 if __name__ == "__main__":
